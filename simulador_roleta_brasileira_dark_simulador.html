@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simulador — Roleta Brasileira (Colunas) — Dark</title>
+  <style>
+    :root{
+      --bg:#0b0f13; --card:#0f1418; --muted:#98a0a6; --accent:#9d7cff; --text:#e6eef6; --danger:#ff6b6b; --glass: rgba(255,255,255,0.03);
+      --radius:12px;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter,Segoe UI,Roboto,Arial; background:linear-gradient(180deg,#071019 0%,#0b0f13 100%); color:var(--text); margin:20px;}
+    .wrapper{max-width:1100px;margin:0 auto;padding:18px}
+    header{display:flex;justify-content:space-between;align-items:center}
+    h1{font-size:18px;margin:0}
+    p.lead{color:var(--muted);margin:6px 0 18px}
+    .grid{display:grid;grid-template-columns:340px 1fr;gap:16px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); border:1px solid rgba(255,255,255,0.04); padding:14px; border-radius:var(--radius)}
+    label{display:block;margin:10px 0 6px;color:var(--muted);font-size:13px}
+    input,select{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--text)}
+    button{background:var(--accent);color:#081018;border:0;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    .muted{color:var(--muted);font-size:13px}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+    .stat{background:var(--glass);padding:10px;border-radius:10px;min-width:140px}
+    .stat .label{color:var(--muted);font-size:12px}
+    .stat .value{font-weight:700;margin-top:6px}
+    table{width:100%;border-collapse:collapse;margin-top:10px;color:var(--muted);font-size:13px}
+    th,td{padding:8px;border-bottom:1px dashed rgba(255,255,255,0.03);text-align:left}
+    .controls{display:flex;gap:8px;align-items:center}
+    .small{padding:8px 10px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--text);cursor:pointer}
+    canvas{width:100%;height:220px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border:1px solid rgba(255,255,255,0.03)}
+    .chip{display:inline-block;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,0.03);color:var(--muted);font-size:12px;margin-right:6px}
+    footer{margin-top:12px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <div>
+        <h1>Simulador — Roleta (Apostas em 2 Colunas — alternando)</h1>
+        <p class="lead">Tema dark • Martingale até 2 níveis • Aposta em duas colunas por rodada (ex.: 1+2, depois 2+3, depois 3+1...)</p>
+      </div>
+      <div class="chip">Offline • Educacional</div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <label>Saldo inicial (R$)</label>
+        <input id="bankroll" type="number" value="1000" min="1" />
+
+        <label>Aposta base por coluna (R$)</label>
+        <input id="baseBet" type="number" value="10" min="1" />
+
+        <label>Número de spins</label>
+        <input id="spins" type="number" value="500" min="1" />
+
+        <label>Limite de perda (stop loss) — 0 desliga</label>
+        <input id="stopLoss" type="number" value="0" min="0" />
+
+        <label>Limite de ganho (take profit) — 0 desliga</label>
+        <input id="takeProfit" type="number" value="0" min="0" />
+
+        <label>Opções</label>
+        <select id="startPair">
+          <option value="1">Iniciar em: Colunas 1+2</option>
+          <option value="2">Iniciar em: Colunas 2+3</option>
+          <option value="3">Iniciar em: Colunas 3+1</option>
+        </select>
+
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="run">Rodar simulação</button>
+          <button id="pause" class="small">Pausar/Retomar</button>
+          <button id="reset" class="small">Reset</button>
+          <button id="export" class="small">Salvar histórico CSV</button>
+        </div>
+
+        <p class="muted" style="margin-top:12px">Regras: aposta em duas colunas por rodada; se uma das colunas sair, o pagamento é 2:1 naquela aposta — ganhando R$ (aposta base) de lucro líquido por rodada vencedora. Martingale: ao perder (nenhuma das colunas saiu), dobra a aposta (por coluna) até 2 níveis; após o 2º nível, volta ao valor base.</p>
+      </div>
+
+      <div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>Resultados</strong>
+            <div class="muted">Spin: <span id="currentSpin">0</span> / <span id="totalSpins">0</span></div>
+          </div>
+
+          <div class="stats" id="summary">
+            <div class="stat"><div class="label">Saldo inicial</div><div class="value" id="s_bankroll">—</div></div>
+            <div class="stat"><div class="label">Saldo atual</div><div class="value" id="s_current">—</div></div>
+            <div class="stat"><div class="label">Maior drawdown</div><div class="value" id="s_drawdown">—</div></div>
+            <div class="stat"><div class="label">Vitórias</div><div class="value" id="s_wins">—</div></div>
+            <div class="stat"><div class="label">Derrotas</div><div class="value" id="s_losses">—</div></div>
+            <div class="stat"><div class="label">Lucro / Prejuízo</div><div class="value" id="s_profit">—</div></div>
+          </div>
+
+          <div style="margin-top:12px"><canvas id="chart"></canvas></div>
+
+          <div style="margin-top:12px">
+            <strong>Histórico (últimos 40 spins)</strong>
+            <table id="history"><thead><tr><th>#</th><th>Spin</th><th>Colunas</th><th>Bet/col</th><th>Resultado</th><th>Saldo</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div style="margin-top:12px" class="card">
+          <strong>Como funciona (resumo)</strong>
+          <p class="muted">A roleta tem números de 0 a 36. Cada coluna tem 12 números. Apostamos em duas colunas por rodada (cobertura parcial). Pagamento por coluna vencedora: 2:1. Ao perder (nenhuma das duas colunas), aplicamos Martingale: dobramos a aposta por coluna até 2 vezes (nível 1 = base, nível 2 = 2x, nível 3 = 4x). Após uma vitória ou ao atingir o nível máximo, retornamos ao valor base. A simulação pode ser pausada/retomada e o histórico salvo em CSV. Um gráfico mostra a evolução do saldo ao longo das rodadas.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer>Abra o arquivo em um navegador moderno. Este simulador é apenas educativo e não realiza apostas reais.</footer>
+  </div>
+
+  <script>
+    const randInt = (min,max)=> Math.floor(Math.random()*(max-min+1))+min;
+    const
